@@ -65,7 +65,16 @@ OPZIONI:
 check-web-page 1.1:
 	BUGFIX
 		corretta generazione data nel corpo di default della mail; prima veniva
-		creato un testo con una data che faceva riverimento all'avvio dello
+		creato un testo con una data che faceva riferimento all'avvio dello
 		script invece che al momento dell'invio stesso della mail.
 		
 [Mirco Bertelli]----------------------------------------------------[30/05/2013]
+
+
+
+check-web-page 1.2:
+	BUGFIX
+		corretto l'errore "bad file descriptor" quando si lancia lo script in
+		modalita' non verbosa.
+		
+[Mirco Bertelli]----------------------------------------------------[18/07/2013]
