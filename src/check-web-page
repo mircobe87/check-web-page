@@ -6,7 +6,7 @@ norm="\e[0m"
 uline="\e[4m"
 
 script_name="check-web-page"
-script_version="1.0"
+script_version="1.1"
 script_author="Mirco Bertelli"
 
 url=""
@@ -225,6 +225,9 @@ while true; do
 	# se i file sono differenti, diff ritorna false
 	if ! diff "$old_page" "$new_page" &> /dev/null ; then
 		print_and_log "rilevata una modifica sulla pagina -- $url"
+		print_and_log "prepraro il corpo della mail..."
+		mail_body="$(get_mail_body $url)"
+		print_and_log "corpo della mail pronto"
 		if [ "$mfalg" ]; then
 			print_and_log "invio mail in corso -- $mail_addr" >&5
 			if echo -e "$mail_body" | mailx -A "$CWP_MAILX_ACCOUNT" -s "$command" "$mail_addr"; then

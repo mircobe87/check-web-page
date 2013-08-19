@@ -59,3 +59,13 @@ OPZIONI:
         mostra un output più ricco di dettagli.
 
 [Mirco Bertelli]----------------------------------------------------[15/04/2013]
+
+
+
+check-web-page 1.1:
+	BUGFIX
+		corretta generazione data nel corpo di default della mail; prima veniva
+		creato un testo con una data che faceva riverimento all'avvio dello
+		script invece che al momento dell'invio stesso della mail.
+		
+[Mirco Bertelli]----------------------------------------------------[30/05/2013]
