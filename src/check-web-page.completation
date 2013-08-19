@@ -1,0 +1,17 @@
+_check-web-page()
+{
+	local cur prev opts
+
+	COMPREPLY=()
+
+	cur="${COMP_WORDS[COMP_CWORD]}"
+	prev="${COMP_WORDS[COMP_CWORD-1]}"
+	opts="-c -h -i -l -m -v -V --command --interval --log-file --mail-addr --help --version --verbose"
+
+	if [[ ${cur} == -* ]] ; then
+		COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+		return 0
+	fi
+}
+
+complete -F _check-web-page check-web-page

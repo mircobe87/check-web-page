@@ -1,0 +1,61 @@
+      _               _                     _                                  
+  ___| |__   ___  ___| | __   __      _____| |__        _ __   __ _  __ _  ___ 
+ / __| '_ \ / _ \/ __| |/ /___\ \ /\ / / _ \ '_ \ _____| '_ \ / _` |/ _` |/ _ \
+| (__| | | |  __/ (__|   <_____\ V  V /  __/ |_) |_____| |_) | (_| | (_| |  __/
+ \___|_| |_|\___|\___|_|\_\     \_/\_/ \___|_.__/      | .__/ \__,_|\__, |\___|
+                                                       |_|          |___/      
+
+Permette di tenere sotto controllo una pagina web finché non viene modificata.
+Una volta rilevata la modifica è possibile inviare una mail anche a più
+destinatari e/o eseguire uno specifico comando.
+
+La mail viene inviata tramite il comando mailx usando uno specifico account
+mailx configurato in uno opportuno file .mailrc e il nome di tale account deve
+essere specificato anche nella variabile d'ambiente CWP_MAILX_ACCOUNT.
+
+Lo script genera una mail con contenuto di default ma il contenuto può essere
+rimpiazzato da quello di un file specificando il suo path nella variabile
+d'ambiente CWP_MAIL_BODY_FILE.
+
+USO:
+    check-web-page [-h | -v]
+    check-web-page [-V] [-l log-file] [-m mail-addr] [-c cmd] [-i time] url
+
+OPZIONI:
+    -c cmd | --command cmd
+        quando viene rilevata una modifica nella pagina viene eseguito il
+        comando cmd specificato.
+
+    -h | --help
+        mostra questa guida utente.
+
+    -i time | --interval time
+        specifica l'attesa tra un controllo e l'altro. time va espresso nel
+        formato NUMBER[SUFFIX]. Lo script attende per NUMBER secondi. SUFFIX può
+        essere 's' per secondi (default), 'm' per minuti, 'h' per ore o 'd' per
+        giorni.
+
+    -l log-file | --log-file log-file
+        specifica il path per un file di log.
+        Di default vinene usato il file ~/check-web-page.log.
+        Ad ogni avvio il file di log viene rimpiazzato con un nuovo file.
+
+    -m mail-addr | --mail-addr mail-addr
+        invia una mail di notifica all'indirizzo mail-addr utilizzando il
+        comando mailx (heirloom-mailx) una volta rilevata una modifica.
+        Possono essere specificati più destinatari scrivendo un elenco separato
+        racchiuso tra virgolette (") di indirizzi separati da uno spazio.
+        Il corpo della mail può essere personalizzato salvandolo in un file e
+        settando la variabile d'ambiente CWP_MAIL_BODY_FILE con il path di tale
+        file. Se la variabile non è settata viene inviato un testo di default.
+        Il comando mailx viene invocato su un account mailx da specificare nella
+        variabile d'ambiente CWP_MAILX_ACCOUNT. Se tale variabile
+        non viene settata non sarà possibile inviare la mail.
+
+    -v | --version
+        mostra le informazioni sulla versione del programma.
+
+    -V | --verbose
+        mostra un output più ricco di dettagli.
+
+[Mirco Bertelli]----------------------------------------------------[15/04/2013]

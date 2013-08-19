@@ -1,0 +1,6 @@
+# Lista di file che Git ingora
+
+# tutti i file che terminano con '~'
+# (tipicamente file temporaneri creati da edito)
+*~
+

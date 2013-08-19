@@ -1,0 +1,258 @@
+#!/bin/bash
+
+command="${0##*/}"
+bold="\e[1m"
+norm="\e[0m"
+uline="\e[4m"
+
+script_name="check-web-page"
+script_version="1.0"
+script_author="Mirco Bertelli"
+
+url=""
+mail_addr=""
+mfalg=""
+cmd=""
+cfalg=""
+wait_time="5"
+#default_mail_body="[$(date)]: la pagina web è stata modificata.\nurl = $url\n\n--\n$script_name $script_version"
+mail_body=""
+log_file="$HOME/check-web-page.log"
+date_format="%D - %T.%N"
+
+function help() {
+	echo -e "${bold}USO${norm}:"
+	echo -e "    ${bold}${command}${norm} [-h | -v]"
+	echo -e "    ${bold}${command}${norm} [-l ${uline}log-file${norm}] [-m ${uline}mail-addr${norm}] [-c ${uline}cmd${norm}] [-i ${uline}time${norm}] ${uline}url${norm}"
+	echo -e ""
+	echo -e "Controlla la pagina web specificata da ${uline}url${norm} ad intervalli di tempo regolari e, se"
+	echo -e "riscontra cambiamenti, notifica l'evento. Al verificarsi della modifica può"
+	echo -e "essere richiesto l'invio di una mail e/o l'esecuzione di un certo comando."
+	echo -e ""
+	echo -e "${bold}OPZIONI${norm}:"
+	echo -e "    ${bold}-c${norm} ${uline}cmd${norm} | ${bold}--command${norm} ${uline}cmd${norm}"
+	echo -e "        quando viene rilevata una modifica nella pagina viene eseguito il"
+	echo -e "        comando ${uline}cmd${norm} specificato."
+	echo -e ""
+	echo -e "    ${bold}-h${norm} | ${bold}--help${norm}"
+	echo -e "        mostra questa guida utente."
+	echo -e ""
+	echo -e "    ${bold}-i${norm} ${uline}time${norm} | ${bold}--interval${norm} ${uline}time${norm}"
+	echo -e "        specifica l'attesa tra un controllo e l'altro. ${uline}time${norm} va espresso nel"
+	echo -e "        formato NUMBER[SUFFIX]. Lo script attende per NUMBER secondi. SUFFIX può"
+	echo -e "        essere 's' per secondi (default), 'm' per minuti, 'h' per ore o 'd' per"
+	echo -e "        giorni."
+	echo -e ""
+	echo -e "    ${bold}-l${norm} ${uline}log-file${norm} | ${bold}--log-file${norm} ${uline}log-file${norm}"
+	echo -e "        specifica il path per un file di log."
+	echo -e "        Di default vinene usato il file ${uline}~/check-web-page.log${norm}."
+	echo -e "        Ad ogni avvio il file di log viene rimpiazzato con un nuovo file."
+	echo -e ""
+	echo -e "    ${bold}-m${norm} ${uline}mail-addr${norm} | ${bold}--mail-addr${norm} ${uline}mail-addr${norm}"
+	echo -e "        invia una mail di notifica all'indirizzo ${uline}mail-addr${norm} utilizzando il"
+	echo -e "        comando ${bold}mailx${norm} (heirloom-mailx) una volta rilevata una modifica."
+	echo -e "        Possono essere specificati più destinatari scrivendo un elenco di"
+	echo -e "        indirizzi separati da uno spaziono racchiuso tra virgolette (\")."
+	echo -e "        Il corpo della mail può essere personalizzato salvandolo in un file e"
+	echo -e "        settando la variabile d'ambiente ${bold}CWP_MAIL_BODY_FILE${norm} con il path di tale"
+	echo -e "        file. Se la variabile non è settata viene inviato un testo di default."
+	echo -e "        Il comando mailx viene invocato su un account mailx da specificare nella"
+	echo -e "        variabile d'ambiente ${bold}CWP_MAILX_ACCOUNT${norm}. Se tale variabile"
+	echo -e "        non viene settata non sarà possibile inviare la mail."
+	echo -e ""
+	echo -e "    ${bold}-v${norm} | ${bold}--version${norm}"
+	echo -e "        mostra le informazioni sulla versione del programma."
+	echo -e ""
+	echo -e "    ${bold}-V${norm} | ${bold}--verbose${norm}"
+	echo -e "        mostra un output più ricco di dettagli."
+	echo -e ""
+}
+
+function version() {
+	echo $script_name $script_version
+	echo "Scritto da" $script_author
+	echo ""
+}
+
+function print_and_log() {
+	echo -e "[$(date +"$date_format")]: $1" | tee -a "$log_file"
+}
+
+function get_mail_body() {
+	if [ "$CWP_MAIL_BODY_FILE" = "" ]; then
+		print_and_log "per la mail verrà usato il testo di default -- CWP_MAIL_BODY_FILE=\""$CWP_MAIL_BODY_FILE"\"" >&5
+		echo -e "[$(date)]: la pagina web è stata modificata.\nurl = $1\n\n--\n$script_name $script_version"
+	else
+		if [ -f "$CWP_MAIL_BODY_FILE" ]; then
+			print_and_log "per la mail verrà usato il seguente testo:" >&5
+			print_and_log "$(cat "$CWP_MAIL_BODY_FILE" | nl -n rz)" >&5
+			cat "$CWP_MAIL_BODY_FILE"
+		else
+			print_and_log "ERROR, il file non esiste o non è un file regolare; per la mail verrà usato il testo di default -- CWP_MAIL_BODY_FILE=\""$CWP_MAIL_BODY_FILE"\"" >&5
+			echo -e "[$(date)]: la pagina web è stata modificata.\nurl = $1\n\n--\n$script_name $script_version"
+		fi
+	fi
+}
+
+function check_mailx() {
+	if ! which mailx &> /dev/null; then
+		echo -e "ERROR, comando non trovato -- mailx" >&2
+		return 1
+	else
+		echo -e "OK, comando trovato -- mailx" >&5
+		if [ "$CWP_MAILX_ACCOUNT" = "" ]; then
+			echo -e "ERROR, account per mailx non specificato -- CWP_MAILX_ACCOUNT=\"$CWP_MAILX_ACCOUNT\"" >&2
+			return 1
+		else	
+			echo -e "OK, account per mailx configurato -- \"$CWP_MAILX_ACCOUNT\"" >&5
+			return 0
+		fi
+	fi
+}
+
+TEMP=$(getopt -o c:hi:l:m:vV --long command:,interval:,log-file:,mail-addr:,help,version,verbose -n "$command" -- "$@")
+
+if [ $? != 0 ]; then
+#	echo "Terminating..." >&2
+	exit 1 ;
+fi
+
+#exec 5>/dev/null # apro in scrittura il file nullo sul destrittore 5
+ 
+eval set -- "$TEMP"
+while true ; do
+	case "$1" in
+		-c | --command) cmd="$2"
+			cflag="true"
+			shift 2
+			;;
+		-i | --interval) wait_time="$2"; shift 2 ;;
+		-l | --log-file) if [ "$2" = "" ]; then
+				echo "$command: specificare un file di log valido" >&2
+				exit 1
+			fi
+			log_file="$2"
+			shift 2
+			;;
+		-m | --mail-addr) if check_mailx; then
+				if [ "$2" = "" ]; then
+					echo "$command: specificare un indirizzo email" >&2
+					exit 1
+				fi
+				mail_addr="$2"
+				mfalg="true"
+				shift 2
+			else
+				exit 1
+			fi ;;
+		-h | --help) help; exit 0 ;;
+		-v | --version) version; exit 0 ;;
+		-V | --verbose) exec 5<&-; exec 5<&2; shift;; # metto sul descrittore 5 la copia dello stderr
+		--) shift ; break ;;
+		*) echo "Internal error!" ; exit 1 ;;
+	esac
+done
+# "Remaining arguments:"
+if [ "$#" = "0" ]; then
+	echo "$command: specificare un URL" >&2
+	exit 1
+elif [ "$#" = "1" ]; then
+	url="$1"
+else
+	echo -n "$command: parametri non attesi -- " >&2
+	shift
+	for arg in $@; do
+		echo -n "\"$arg\" " >&2
+	done
+	echo "" >&2
+	exit 1
+fi
+
+old_page="./.cwp_old_web_page.html"
+new_page="./.cwp_new_web_page.html"
+
+#gestisco i segnali SIGINT e SIGTERM per ripulire l'ambiente
+function sig_handler() {
+	print_and_log "ricevuto il segnale $1" >&5
+	print_and_log "eliminazione file $old_page $new_page ..." >&5
+	rm $old_page $new_page &> /dev/null
+	print_and_log "sessione terminata" >&5
+	exit 1
+}
+trap "sig_handler \"SIGINT\"" INT
+trap "sig_handler \"SIGTERM\"" TERM
+
+
+rm $old_page $new_page $log_file &> /dev/null
+
+print_and_log "Avvio nuova sessione di $command..." >&5
+
+mail_body="$(get_mail_body $url)"
+
+print_and_log "Riepilogo...\n\tURL: \"$url\"\n\tWAIT: $wait_time\n\tCOMMAND: $cmd\n\tMAIL ADDRES: $mail_addr\n\tMAIL BODY:\n$(echo -e "$mail_body" | while read line; do echo -e "\t\t$line"; done)" >&5
+
+print_and_log "scaricamento della pagina campione -- $url" >&5
+if ! wget --no-cache -O "$old_page" "$url" &> /dev/null ; then
+	print_and_log "ERROR, impossibile recuperare la pagina -- $url" >&2
+	print_and_log "sessione terminata" >&5
+#	echo -e "$command: impossibile recuperare la pagina -- $url"
+	exit 1
+fi
+
+print_and_log "OK, pagina campione recuperata -- $url -> $old_page" >&5
+print_and_log "il primo controlla avvera' tra $wait_time" >&5
+
+while true; do
+	if ! sleep $wait_time; then
+		print_and_log "ERROR, valore di attesa non valido -- $wait_time" >&2
+#		echo -e "$command: valore non valido -- $wait_time"
+		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
+		rm $old_page $new_page &> /dev/null
+		print_and_log "sessione terminata" >&5
+		exit 1
+	fi
+
+	print_and_log "scaricamento della nuova pagina -- $url" >&5
+	if ! wget --no-cache -O "$new_page" "$url" &> /dev/null ; then
+		print_and_log "ERROR, impossibile recuperare la pagina -- $url" >&2
+		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
+		rm $old_page $new_page &> /dev/null
+		print_and_log "sessione terminata" >&5
+#		echo -e "$command: impossibile recuperare la pagina -- $url"
+		exit 1
+	fi
+	print_and_log "OK, nuova pagina recuperata -- $url -> $new_page" >&5
+	# se i file sono differenti, diff ritorna false
+	if ! diff "$old_page" "$new_page" &> /dev/null ; then
+		print_and_log "rilevata una modifica sulla pagina -- $url"
+		if [ "$mfalg" ]; then
+			print_and_log "invio mail in corso -- $mail_addr" >&5
+			if echo -e "$mail_body" | mailx -A "$CWP_MAILX_ACCOUNT" -s "$command" "$mail_addr"; then
+				print_and_log "invio riuscito" >&5
+			else
+				print_and_log "invio fallito" >&5
+			fi
+		fi
+		
+		if [ "$cflag" ]; then
+			print_and_log "esecuzione del comando in corso -- $cmd" >&5
+			if $cmd; then
+				print_and_log "esecuzione riuscita" >&5
+			else
+				print_and_log "esecuzione fallita" >&5
+			fi
+		fi
+		
+		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
+		rm $old_page $new_page &> /dev/null
+		print_and_log "sessione terminata" >&5
+		exit 0
+		
+	else
+		print_and_log "nessuna modifica rilevata" >&5
+		print_and_log "prossimo controlla tra $wait_time" >&5
+	fi
+	
+done
+
+exit 0

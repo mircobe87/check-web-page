@@ -1,0 +1,13 @@
+# nome per programma da installare
+check-web-page
+
+# script principale del programma
+check-web-page
+	# verrà installato qui
+	/usr/local/bin
+
+# file per l'autocompletamento
+check-web-page.completation
+	# verrà installato qui
+	/etc/bash_completion.d
+
