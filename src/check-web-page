@@ -113,10 +113,15 @@ function check_mailx() {
 function get_last_modified () {
 	local url="$1"
 	local hline=""
-	
-	curl -isX HEAD $url -H 'Connection: close' | while read hline; do
+
+	if [ "$( curl -sX HEAD $url -H 'Connection: close' -w '%{http_code}' )" != "200" ]; then
+		return 1
+	fi
+
+	curl -isX HEAD $url -H 'Connection: close' 2> /dev/null | while read hline; do
 		local head="${hline%%:*}"
 		local value="${hline#*:}"
+		#echo "head: $head    value: $value"
 		if [ "$head" = "Last-Modified" ]; then
 			echo "$value"
 			return 0
@@ -128,6 +133,10 @@ function get_last_modified () {
 function is_modified_since () {
 	local url="$1"
 	local lastModified="$2"
+
+	if [ "$( curl -sX HEAD $url -H 'Connection: close' -w '%{http_code}' )" != "200" ]; then
+		return 1
+	fi
 
 	local statusCode=$( curl -sX HEAD $url                           \
 		                 -H 'Connection: close'                  \
@@ -201,14 +210,11 @@ else
 	exit 1
 fi
 
-old_page="./.cwp_old_web_page.html"
-new_page="./.cwp_new_web_page.html"
+lastModDate=""
 
 #gestisco i segnali SIGINT e SIGTERM per ripulire l'ambiente
 function sig_handler() {
 	print_and_log "ricevuto il segnale $1" >&5
-	print_and_log "eliminazione file $old_page $new_page ..." >&5
-	rm $old_page $new_page &> /dev/null
 	print_and_log "sessione terminata" >&5
 	exit 1
 }
@@ -216,7 +222,7 @@ trap "sig_handler \"SIGINT\"" INT
 trap "sig_handler \"SIGTERM\"" TERM
 
 
-rm $old_page $new_page $log_file &> /dev/null
+rm $log_file &> /dev/null
 
 print_and_log "Avvio nuova sessione di $command..." >&5
 
@@ -224,39 +230,34 @@ mail_body="$(get_mail_body $url)"
 
 print_and_log "Riepilogo...\n\tURL: \"$url\"\n\tWAIT: $wait_time\n\tCOMMAND: $cmd\n\tMAIL ADDRES: $mail_addr\n\tMAIL BODY:\n$(echo -e "$mail_body" | while read line; do echo -e "\t\t$line"; done)" >&5
 
-print_and_log "scaricamento della pagina campione -- $url" >&5
-if ! wget --no-cache -O "$old_page" "$url" &> /dev/null ; then
-	print_and_log "ERROR, impossibile recuperare la pagina -- $url" >&2
+print_and_log "recupero data di ultima modifica del documento -- $url" >&5
+lastModDate="$( get_lase_modified $url )"
+if [ "$?" != "0" ] ; then
+	print_and_log "ERROR, impossibile recuperare la data di ultima modifica -- $url" >&2
 	print_and_log "sessione terminata" >&5
 #	echo -e "$command: impossibile recuperare la pagina -- $url"
 	exit 1
 fi
 
-print_and_log "OK, pagina campione recuperata -- $url -> $old_page" >&5
+print_and_log "OK, ultima modifica risale al -- $lastModDate" >&5
 print_and_log "il primo controlla avvera' tra $wait_time" >&5
 
 while true; do
 	if ! sleep $wait_time; then
 		print_and_log "ERROR, valore di attesa non valido -- $wait_time" >&2
-#		echo -e "$command: valore non valido -- $wait_time"
-		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
-		rm $old_page $new_page &> /dev/null
 		print_and_log "sessione terminata" >&5
 		exit 1
 	fi
-
-	print_and_log "scaricamento della nuova pagina -- $url" >&5
-	if ! wget --no-cache -O "$new_page" "$url" &> /dev/null ; then
-		print_and_log "ERROR, impossibile recuperare la pagina -- $url" >&2
-		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
-		rm $old_page $new_page &> /dev/null
+	
+	print_and_log "controllo modifiche alla pagina -- $url" >&5
+	isChanged="$( is_modified_since $url $lastModDate )"
+	if [ "$?" != "0" ]; then
+		print_and_log "ERROR, impossibile recuperare informazini sulla pagina -- $url" >&2
 		print_and_log "sessione terminata" >&5
-#		echo -e "$command: impossibile recuperare la pagina -- $url"
 		exit 1
 	fi
-	print_and_log "OK, nuova pagina recuperata -- $url -> $new_page" >&5
-	# se i file sono differenti, diff ritorna false
-	if ! diff "$old_page" "$new_page" &> /dev/null ; then
+	print_and_log "OK, recuperato header http della pagina  -- $url" >&5
+	if [ "$isChanged" == "true" ]; then
 		print_and_log "rilevata una modifica sulla pagina -- $url"
 		print_and_log "prepraro il corpo della mail..."
 		mail_body="$(get_mail_body $url)"
@@ -279,11 +280,8 @@ while true; do
 			fi
 		fi
 		
-		print_and_log "rimozione file \"$old_page\" e \"$new_page\"..." >&5
-		rm $old_page $new_page &> /dev/null
 		print_and_log "sessione terminata" >&5
 		exit 0
-		
 	else
 		print_and_log "nessuna modifica rilevata" >&5
 		print_and_log "prossimo controlla tra $wait_time" >&5
