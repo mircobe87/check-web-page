@@ -6,7 +6,7 @@ norm="\e[0m"
 uline="\e[4m"
 
 script_name="check-web-page"
-script_version="1.2"
+script_version="2.0"
 script_author="Mirco Bertelli"
 
 url=""
@@ -107,6 +107,39 @@ function check_mailx() {
 			echo -e "OK, account per mailx configurato -- \"$CWP_MAILX_ACCOUNT\"" >&5
 			return 0
 		fi
+	fi
+}
+
+function get_last_modified () {
+	local url="$1"
+	local hline=""
+	
+	curl -isX HEAD $url -H 'Connection: close' | while read hline; do
+		local head="${hline%%:*}"
+		local value="${hline#*:}"
+		if [ "$head" = "Last-Modified" ]; then
+			echo "$value"
+			return 0
+		fi
+	done
+	return 1
+}
+
+function is_modified_since () {
+	local url="$1"
+	local lastModified="$2"
+
+	local statusCode=$( curl -sX HEAD $url                           \
+		                 -H 'Connection: close'                  \
+		                 -H "If-modified-since: $lastModified"   \
+		                 -w '%{http_code}'                       \
+		          )
+	if [ "$statusCode" = "200" ]; then
+		echo true
+		return 0
+	else
+		echo false
+		return 1
 	fi
 }
 
