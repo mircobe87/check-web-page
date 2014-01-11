@@ -66,6 +66,18 @@ function help() {
 	echo -e "    ${bold}-V${norm} | ${bold}--verbose${norm}"
 	echo -e "        mostra un output più ricco di dettagli."
 	echo -e ""
+	echo -e "${bold}DIPENDENZE${norm}:"
+	echo -e "    Questo script dipende essenzialmente da i seguenti software:"
+	echo -e ""
+	echo -e "        ${bold}mailx${norm} (heirloom-mailx) che utilizza per l'invio di messaggi di posta"
+	echo -e "              elettronica;"
+	echo -e ""
+	echo -e "        ${bold}curl${norm}  che utilizza per comporre le richieste http utilizzate per"
+	echo -e "              recuperare le informazioni sul documento remoto"
+	echo -e ""
+	echo -e "    Assicurarsi di aver installare le suddete dipendenze per un corretto"
+	echo -e "    funzionamento."
+	echo -e ""
 }
 
 function version() {
