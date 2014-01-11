@@ -125,7 +125,7 @@ function check_mailx() {
 function get_last_modified () {
 	local url="$1"
 	local hline=""
-
+	
 	if [ "$( curl -sX HEAD $url -H 'Connection: close' -w '%{http_code}' )" != "200" ]; then
 		return 1
 	fi
@@ -139,6 +139,7 @@ function get_last_modified () {
 			return 0
 		fi
 	done
+	echo ""
 	return 1
 }
 
@@ -243,8 +244,8 @@ mail_body="$(get_mail_body $url)"
 print_and_log "Riepilogo...\n\tURL: \"$url\"\n\tWAIT: $wait_time\n\tCOMMAND: $cmd\n\tMAIL ADDRES: $mail_addr\n\tMAIL BODY:\n$(echo -e "$mail_body" | while read line; do echo -e "\t\t$line"; done)" >&5
 
 print_and_log "recupero data di ultima modifica del documento -- $url" >&5
-lastModDate="$( get_lase_modified $url )"
-if [ "$?" != "0" ] ; then
+lastModDate="$( get_last_modified $url )"
+if [ "$lastModDate" = "" ] ; then
 	print_and_log "ERROR, impossibile recuperare la data di ultima modifica -- $url" >&2
 	print_and_log "sessione terminata" >&5
 #	echo -e "$command: impossibile recuperare la pagina -- $url"
