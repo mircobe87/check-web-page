@@ -146,22 +146,24 @@ function get_last_modified () {
 function is_modified_since () {
 	local url="$1"
 	local lastModified="$2"
-
-	if [ "$( curl -sX HEAD $url -H 'Connection: close' -w '%{http_code}' )" != "200" ]; then
-		return 1
+	local testUrl="$( curl -sX HEAD $url -H 'Connection: close' -w '%{http_code}' )"
+	echo "testUrl: $testUrl" >&2
+	if [ "$testUrl" != "200" ]; then
+		echo ""
 	fi
 
-	local statusCode=$( curl -sX HEAD $url                           \
+	local statusCode=$( curl -sX HEAD $url                       \
 		                 -H 'Connection: close'                  \
 		                 -H "If-modified-since: $lastModified"   \
 		                 -w '%{http_code}'                       \
-		          )
+		              )
+	echo "url: $url" >&2
+	echo "lastModified: $lastModified" >&2
+	echo "statusCode: $statusCode" >&2
 	if [ "$statusCode" = "200" ]; then
 		echo true
-		return 0
 	else
 		echo false
-		return 1
 	fi
 }
 
@@ -263,14 +265,14 @@ while true; do
 	fi
 	
 	print_and_log "controllo modifiche alla pagina -- $url" >&5
-	isChanged="$( is_modified_since $url $lastModDate )"
-	if [ "$?" != "0" ]; then
+	isChanged=$( is_modified_since "$url" "$lastModDate" )
+	if [ "$isChanged" = "" ]; then
 		print_and_log "ERROR, impossibile recuperare informazini sulla pagina -- $url" >&2
 		print_and_log "sessione terminata" >&5
 		exit 1
 	fi
 	print_and_log "OK, recuperato header http della pagina  -- $url" >&5
-	if [ "$isChanged" == "true" ]; then
+	if [ "$isChanged" = "true" ]; then
 		print_and_log "rilevata una modifica sulla pagina -- $url"
 		print_and_log "prepraro il corpo della mail..."
 		mail_body="$(get_mail_body $url)"
